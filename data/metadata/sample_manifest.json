@@ -1,0 +1,5 @@
+{
+  "samples": [],
+  "benign_samples": [],
+  "_note": "Chạy scripts/01_fetch_sample_metadata.py hoặc generate_demo_logs.py trên VM"
+}

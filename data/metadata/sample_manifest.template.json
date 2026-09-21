@@ -1,0 +1,23 @@
+{
+  "_comment": "Copy thành sample_manifest.json sau khi tải sample trên VM",
+  "samples": [
+    {
+      "sha256": "REPLACE_WITH_SHA256",
+      "filename": "sample.exe",
+      "family_id": "S1149",
+      "family_name": "CHIMNEYSWEEP",
+      "group": "G1",
+      "source": "malwarebazaar",
+      "sandbox_log": "data/sandbox_logs/REPLACE_WITH_SHA256.json",
+      "notes": "Dynamic analysis log từ Cuckoo/Procmon/API Monitor"
+    }
+  ],
+  "benign_samples": [
+    {
+      "sha256": "REPLACE_WITH_SHA256",
+      "filename": "notepad.exe",
+      "group": "benign",
+      "source": "system"
+    }
+  ]
+}

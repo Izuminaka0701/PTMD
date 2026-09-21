@@ -1,0 +1,61 @@
+# PTMD — Dynamic API Resolution Detection via MCAFF
+# Chạy trên máy ảo cô lập (isolated VM) — CPU only
+
+project:
+  name: "PTMD-DAR-MCAFF"
+  seed: 42
+
+paths:
+  samples_dir: "data/samples"
+  sandbox_logs_dir: "data/sandbox_logs"
+  processed_dir: "data/processed"
+  metadata_file: "data/metadata/mitre_families.json"
+  manifest_file: "data/metadata/sample_manifest.json"
+  checkpoint_dir: "checkpoints"
+
+# Feature extraction (3 nguồn → 1 luồng unified)
+features:
+  static:
+    feature_dim: 64            # PE + IAT features
+  behavior:
+    max_seq_len: 512           # API call sequence (dùng cho extraction)
+    embed_dim: 128
+  graph:
+    max_nodes: 256
+    node_feature_dim: 32
+
+# MCAFF model — Multi-Head Cross-Attention Feature Fusion
+model:
+  # Feature group dimensions (auto from UnifiedFeatureExtractor)
+  static_dim: 64
+  behavior_dim: 15
+  graph_dim: 5
+  # Cross-Attention parameters
+  d_model: 64                  # Common projection dimension
+  num_heads: 4                 # Multi-head attention heads
+  num_attention_layers: 2      # Number of cross-attention blocks
+  ffn_ratio: 4                 # FFN hidden = d_model * ffn_ratio
+  pool_strategy: "mean"        # mean | cls | concat
+  # Classification
+  num_classes: 3               # G1, G2, G3
+  dropout: 0.1
+  family_classifier: true      # Auxiliary multi-label family head
+  num_families: 20
+
+training:
+  batch_size: 16
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.0001
+  val_split: 0.15
+  test_split: 0.15
+  early_stopping_patience: 10
+  device: "cpu"                # CPU only (VM không có GPU)
+
+# Nguồn sample — API key trong .env (ABUSECH_API_KEY)
+sample_sources:
+  malwarebazaar:
+    api_url: "https://mb-api.abuse.ch/api/v1/"
+    enabled: true
+    rate_limit_sec: 1.5
+    zip_password: "infected"

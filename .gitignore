@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.venv-*/
+*.egg
+
+# Data — KHÔNG commit malware thật
+data/samples/*
+!data/samples/.gitkeep
+data/sandbox_logs/*
+!data/sandbox_logs/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/downloads/*
+!data/downloads/.gitkeep
+
+# Model checkpoints
+checkpoints/
+runs/
+*.pt
+*.pth
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.key

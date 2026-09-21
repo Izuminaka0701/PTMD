@@ -1,0 +1,183 @@
+{
+  "technique_groups": {
+    "G1": {
+      "name": "GetProcAddress / LoadLibrary",
+      "description": "Dynamic linking qua Win32 API chuẩn, IAT vẫn có thể nhìn thấy",
+      "indicators": ["LoadLibrary", "LoadLibraryA", "LoadLibraryW", "GetProcAddress", "GetModuleHandle"]
+    },
+    "G2": {
+      "name": "PEB Traversal",
+      "description": "Walk PEB để tìm kernel32 base, parse export table thủ công, không dùng Win32 resolve",
+      "indicators": ["PEB_access", "export_table_parse", "ROR13_hash", "manual_module_enum"]
+    },
+    "G3": {
+      "name": "Encrypted API Name + Indirect Call",
+      "description": "API names bị hash/XOR/encrypt, resolve tại runtime qua custom algorithm",
+      "indicators": ["hash_resolve", "XOR_decrypt", "DJB2", "CRC32", "custom_seed_hash", "indirect_call"]
+    }
+  },
+  "apt_groups": [
+    {"id": "G0094", "name": "Kimsuky", "country": "North Korea", "technique": "Custom hashing techniques"},
+    {"id": "G0032", "name": "Lazarus Group", "country": "North Korea", "technique": "Custom hashing trong shellcode"},
+    {"id": "G0129", "name": "Mustang Panda", "country": "China", "technique": "Obfuscated API calls hashed"}
+  ],
+  "families": [
+    {
+      "id": "S1053",
+      "name": "AvosLocker",
+      "type": "Ransomware",
+      "technique": "API calls obfuscated bằng checksum",
+      "group": "G3",
+      "hash_algorithm": "CRC/checksum",
+      "mitre_url": "https://attack.mitre.org/software/S1053/"
+    },
+    {
+      "id": "S0534",
+      "name": "Bazar",
+      "type": "Loader",
+      "technique": "Hash + resolve API calls tại runtime",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S0534/"
+    },
+    {
+      "id": "S1063",
+      "name": "Brute Ratel C4",
+      "type": "C2 Framework",
+      "technique": "Dynamically resolve hashed APIs",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S1063/"
+    },
+    {
+      "id": "S1237",
+      "name": "CANONSTAGER",
+      "type": "Espionage",
+      "technique": "Custom API hashing",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S1237/"
+    },
+    {
+      "id": "S1149",
+      "name": "CHIMNEYSWEEP",
+      "type": "Backdoor",
+      "technique": "LoadLibrary + GetProcAddress runtime",
+      "group": "G1",
+      "hash_algorithm": null,
+      "mitre_url": "https://attack.mitre.org/software/S1149/"
+    },
+    {
+      "id": "S1236",
+      "name": "CLAIMLOADER",
+      "type": "Loader",
+      "technique": "XOR-encrypted API names + LdrLoadDll()",
+      "group": "G3",
+      "hash_algorithm": "XOR",
+      "mitre_url": "https://attack.mitre.org/software/S1236/"
+    },
+    {
+      "id": "S9023",
+      "name": "HiddenFace",
+      "type": "Backdoor",
+      "technique": "Dynamically resolve Windows APIs",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S9023/"
+    },
+    {
+      "id": "S9007",
+      "name": "HTTPTroy",
+      "type": "Backdoor",
+      "technique": "Arithmetic/logical ops để reconstruct API calls",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S9007/"
+    },
+    {
+      "id": "S1160",
+      "name": "Latrodectus",
+      "type": "Loader",
+      "technique": "Resolve Windows APIs dynamically by hash",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S1160/"
+    },
+    {
+      "id": "S9020",
+      "name": "LODEINFO",
+      "type": "Backdoor",
+      "technique": "Hashing algorithm để resolve API addresses",
+      "group": "G3",
+      "hash_algorithm": "Custom",
+      "mitre_url": "https://attack.mitre.org/software/S9020/"
+    },
+    {
+      "id": "S0013",
+      "name": "PlugX",
+      "type": "RAT",
+      "technique": "Obfuscated API calls concealed as hashes",
+      "group": "G2",
+      "hash_algorithm": "PEB-based",
+      "mitre_url": "https://attack.mitre.org/software/S0013/",
+      "apt_group": "G0129"
+    },
+    {
+      "id": "S1148",
+      "name": "Raccoon Stealer",
+      "type": "Infostealer",
+      "technique": "Dynamically links WinAPI functions at execution",
+      "group": "G1",
+      "hash_algorithm": null,
+      "mitre_url": "https://attack.mitre.org/software/S1148/"
+    },
+    {
+      "id": "S1099",
+      "name": "Samurai",
+      "type": "Backdoor",
+      "technique": "XOR-based algorithm encrypt API name strings",
+      "group": "G3",
+      "hash_algorithm": "XOR",
+      "mitre_url": "https://attack.mitre.org/software/S1099/"
+    },
+    {
+      "id": "S1232",
+      "name": "SplatDropper",
+      "type": "Loader",
+      "technique": "Hashed API calls, seed = 131313",
+      "group": "G3",
+      "hash_algorithm": "Custom seed 131313",
+      "mitre_url": "https://attack.mitre.org/software/S1232/"
+    },
+    {
+      "id": "S1239",
+      "name": "TONESHELL",
+      "type": "Backdoor",
+      "technique": "Modified DJB2 algorithm để resolve APIs",
+      "group": "G3",
+      "hash_algorithm": "DJB2 variant",
+      "mitre_url": "https://attack.mitre.org/software/S1239/"
+    },
+    {
+      "id": "S0154",
+      "name": "Cobalt Strike",
+      "type": "C2 Framework",
+      "technique": "PEB walk + ROR13 hash",
+      "group": "G2",
+      "hash_algorithm": "ROR13",
+      "mitre_url": "https://attack.mitre.org/software/S0154/",
+      "note": "Case study chuẩn G2"
+    },
+    {
+      "id": "S0366",
+      "name": "WannaCry",
+      "type": "Ransomware",
+      "technique": "Import rõ, load thêm runtime qua GetProcAddress",
+      "group": "G1",
+      "hash_algorithm": null,
+      "mitre_url": "https://attack.mitre.org/software/S0366/"
+    }
+  ],
+  "group_label_map": {"G1": 0, "G2": 1, "G3": 2},
+  "benign_label": -1
+}
