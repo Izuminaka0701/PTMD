@@ -101,7 +101,7 @@ def main() -> None:
         attn = out["attn_weights"][-1].squeeze(0).cpu().numpy()
         for i, from_g in enumerate(group_labels):
             for j, to_g in enumerate(group_labels):
-                print(f"  {from_g} → {to_g}: {attn[i][j]:.4f}")
+                print(f"  {from_g} -> {to_g}: {attn[i][j]:.4f}")
 
     print(f"\nFeature metadata: {features['metadata']}")
 

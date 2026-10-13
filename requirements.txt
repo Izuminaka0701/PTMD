@@ -7,7 +7,7 @@ pyyaml>=6.0
 tqdm>=4.66.0
 
 # Static analysis
-pefile>=2023.2.7,<2025.0.0
+pefile>=2023.2.7
 
 # Graph / viz (optional, for thesis figures)
 matplotlib>=3.7.0
@@ -17,3 +17,4 @@ seaborn>=0.13.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 pyzipper>=0.3.6
+

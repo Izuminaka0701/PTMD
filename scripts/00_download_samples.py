@@ -72,18 +72,18 @@ def main() -> None:
                 s["local_path"] = str(path)
                 s["filename"] = path.name
                 ok += 1
-                print(f"       → {path.name}")
+                print(f"       -> {path.name}")
             else:
                 fail += 1
-                print("       → FAILED (empty response)")
+                print("       -> FAILED (empty response)")
         except Exception as ex:
             fail += 1
-            print(f"       → ERROR: {ex}")
+            print(f"       -> ERROR: {ex}")
         time.sleep(0.3)
 
     save_json(manifest, manifest_path)
     print(f"\nDone: downloaded={ok}, skipped={skip}, failed={fail}")
-    print(f"Manifest updated → {manifest_path}")
+    print(f"Manifest updated -> {manifest_path}")
 
 
 if __name__ == "__main__":

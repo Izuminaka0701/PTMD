@@ -63,15 +63,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch malware metadata from MalwareBazaar")
     parser.add_argument("--family", type=str, help="Lọc theo tên MITRE family")
     parser.add_argument("--limit", type=int, default=5, help="Max sample mỗi family")
-    parser.add_argument("--download", action="store_true", help="Tải luôn sample về data/samples/")
     parser.add_argument("--yes", "-y", action="store_true", help="Bỏ qua confirm prompt (dùng cho automation)")
+    parser.add_argument("--download", action="store_true", help="Tải luôn sample về data/samples/")
     parser.add_argument("--output", type=str, default=None)
     args = parser.parse_args()
 
     cfg = load_config()
     if not cfg["api"]["malwarebazaar_key_set"]:
         print("ERROR: ABUSECH_API_KEY chưa được cấu hình.")
-        print("  Copy .env.example → .env và điền API key từ https://auth.abuse.ch/")
+        print("  Copy .env.example -> .env và điền API key từ https://auth.abuse.ch/")
         sys.exit(1)
 
     try:
@@ -93,7 +93,7 @@ def main() -> None:
     print(f"Querying MalwareBazaar ({len(families)} families)...")
 
     for fam in families:
-        print(f"  → {fam['name']} ({fam['group']})")
+        print(f"  >> {fam['name']} ({fam['group']})")
         found = fetch_for_family(client, fam, args.limit)
         print(f"    Found {len(found)} samples")
         all_samples.extend(found)
@@ -107,7 +107,7 @@ def main() -> None:
                 print("Đã hủy download. Chỉ lưu metadata.")
                 out_path = Path(args.output or cfg["paths"]["manifest_file"])
                 save_json({"samples": all_samples, "benign_samples": []}, out_path)
-                print(f"Saved {len(all_samples)} entries → {out_path}")
+                print(f"Saved {len(all_samples)} entries -> {out_path}")
                 return
         samples_dir = Path(cfg["paths"]["samples_dir"])
         samples_dir.mkdir(parents=True, exist_ok=True)
@@ -123,9 +123,9 @@ def main() -> None:
 
     out_path = Path(args.output or cfg["paths"]["manifest_file"])
     save_json({"samples": all_samples, "benign_samples": []}, out_path)
-    print(f"\nSaved {len(all_samples)} entries → {out_path}")
+    print(f"\nSaved {len(all_samples)} entries -> {out_path}")
     print("\nNext steps:")
-    print("  1. Dynamic analysis → data/sandbox_logs/<sha256>.json")
+    print("  1. Dynamic analysis -> data/sandbox_logs/<sha256>.json")
     print("  2. python scripts/02_extract_features.py")
     print("  3. python scripts/03_train_model.py --device cuda")
 

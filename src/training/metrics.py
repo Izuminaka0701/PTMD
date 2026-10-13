@@ -13,24 +13,26 @@ from sklearn.metrics import (
 )
 
 GROUP_NAMES = ["G1_GetProcAddress", "G2_PEB_Traversal", "G3_Hash_Encrypted"]
+ALL_LABELS = [0, 1, 2]
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
-        "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
-        "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "precision_macro": float(precision_score(y_true, y_pred, labels=ALL_LABELS, average="macro", zero_division=0)),
+        "recall_macro": float(recall_score(y_true, y_pred, labels=ALL_LABELS, average="macro", zero_division=0)),
+        "f1_macro": float(f1_score(y_true, y_pred, labels=ALL_LABELS, average="macro", zero_division=0)),
         "f1_per_class": {
             GROUP_NAMES[i]: float(f1_score(y_true, y_pred, labels=[i], average="macro", zero_division=0))
             for i in range(len(GROUP_NAMES))
         },
-        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=[0, 1, 2]).tolist(),
+        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=ALL_LABELS).tolist(),
     }
 
 
 def classification_report_dict(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     report = classification_report(
-        y_true, y_pred, target_names=GROUP_NAMES, output_dict=True, zero_division=0
+        y_true, y_pred, labels=ALL_LABELS, target_names=GROUP_NAMES, output_dict=True, zero_division=0
     )
     return report
+

@@ -34,3 +34,4 @@ Thumbs.db
 # Secrets
 .env
 *.key
+PTMD.zip

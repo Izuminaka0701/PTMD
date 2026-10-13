@@ -98,8 +98,8 @@ def main() -> None:
         })
 
     save_json(manifest, manifest_path)
-    print(f"Generated {len(meta['families'])} demo logs → {logs_dir}")
-    print(f"Updated manifest → {manifest_path}")
+    print(f"Generated {len(meta['families'])} demo logs -> {logs_dir}")
+    print(f"Updated manifest -> {manifest_path}")
     print("\nLưu ý: Cần đặt file PE tương ứng vào data/samples/demo_s1149.exe, ...")
     print("       Hoặc thay sha256 bằng hash thật sau khi tải từ MalwareBazaar.")
 

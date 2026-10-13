@@ -5,6 +5,7 @@ Bước 2 — Trích xuất unified features từ sample + sandbox log cho MCAFF
 Usage (trên VM):
   python scripts/02_extract_features.py
   python scripts/02_extract_features.py --verify-dar
+  python scripts/02_extract_features.py --demo-only   # Chỉ dùng sandbox logs, không cần PE files
 """
 
 from __future__ import annotations
@@ -12,6 +13,8 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -33,6 +36,96 @@ def load_api_calls(log_path: Path) -> list[dict]:
     return data.get("api_calls", data if isinstance(data, list) else [])
 
 
+def _synthesize_static_features(
+    api_calls: list[dict], group: str, feature_dim: int = 64
+) -> dict:
+    """
+    Tạo synthetic static features từ sandbox log khi không có PE file thật.
+    Dùng cho demo/testing — giả lập IAT features dựa trên behavioral pattern.
+    """
+    api_names = {c.get("api", c.get("function", "")) for c in api_calls}
+    modules = {c.get("module", c.get("dll", "")) for c in api_calls}
+
+    from src.features.static_pe import G1_APIS, G2_INDICATOR_APIS, G3_SUSPICIOUS_APIS
+
+    g1_hits = sum(1 for a in api_names if a in G1_APIS)
+    g2_hits = sum(1 for a in api_names if a in G2_INDICATOR_APIS)
+    g3_hits = sum(1 for a in api_names if a in G3_SUSPICIOUS_APIS)
+    num_imports = len(api_names)
+    n = max(num_imports, 1)
+
+    # Synthetic IAT sparse indicators per group
+    group_profiles = {
+        "G1": {"num_sections": 4, "has_loadlib": 1.0, "has_getproc": 1.0, "entropy": 5.5},
+        "G2": {"num_sections": 5, "has_loadlib": 0.0, "has_getproc": 0.0, "entropy": 6.5},
+        "G3": {"num_sections": 3, "has_loadlib": 0.0, "has_getproc": 0.0, "entropy": 7.5},
+    }
+    profile = group_profiles.get(group, group_profiles["G1"])
+
+    raw = [
+        profile["num_sections"],        # num_sections
+        float(num_imports),             # num_imports
+        float(len(modules)),            # num_import_dlls
+        profile["has_loadlib"],         # has_loadlibrary
+        profile["has_getproc"],         # has_getprocaddress
+        0.0,                            # has_ldr_load_dll
+        g1_hits / n,                    # g1_api_ratio
+        g2_hits / n,                    # g2_indicator_ratio
+        g3_hits / n,                    # g3_suspicious_ratio
+        profile["entropy"],             # text_entropy
+        profile["entropy"] * 0.8,       # data_entropy
+        profile["entropy"] * 0.9,       # overall_entropy
+        0.01,                           # import_table_size_ratio
+        0.0,                            # is_dll
+        1.0,                            # is_64bit
+        1.0,                            # has_reloc
+        0.0,                            # has_tls
+        0.0,                            # num_exports
+        float(sum(1 for _ in [] if True)),  # suspicious_section_count
+        max(0.0, 1.0 - num_imports / 15),   # iat_sparse_score
+        0.0,                            # missing_kernel32_direct
+        0.0,                            # entry_point_section_idx
+        0.0,                            # overlay_size_ratio
+        1.0,                            # rich_header_present
+        0.0,                            # num_resources
+        0.0,                            # debug_present
+    ]
+
+    # Pad to feature_dim with polynomial interaction terms (same as StaticPEExtractor)
+    arr = np.array(raw, dtype=np.float32)
+    if len(arr) < feature_dim:
+        extra = []
+        n_raw = len(arr)
+        for i in range(min(n_raw, feature_dim)):
+            for j in range(i + 1, min(i + 6, n_raw)):
+                extra.append(arr[i] * arr[j])
+                if n_raw + len(extra) >= feature_dim:
+                    break
+            if n_raw + len(extra) >= feature_dim:
+                break
+        arr = np.concatenate([arr, np.array(extra[: feature_dim - len(arr)], dtype=np.float32)])
+        if len(arr) < feature_dim:
+            arr = np.concatenate([arr, np.zeros(feature_dim - len(arr), dtype=np.float32)])
+    arr = arr[:feature_dim]
+
+    # DAR score
+    has_loadlib = bool(api_names & {"LoadLibraryA", "LoadLibraryW", "LoadLibraryExA", "LoadLibraryExW"})
+    has_getproc = "GetProcAddress" in api_names
+    dar_score = 0.0
+    if num_imports < 20 and has_loadlib and has_getproc:
+        dar_score = 1.0 - min(num_imports / 20.0, 1.0)
+
+    return {
+        "feature_vector": arr,
+        "feature_names": [],
+        "num_imports": num_imports,
+        "import_dlls": sorted(modules),
+        "g1_apis_found": sorted(api_names & G1_APIS),
+        "dar_score": dar_score,
+        "metadata": {"path": "synthetic", "sha256_hint": "demo"},
+    }
+
+
 def extract_one(
     sample: dict,
     samples_dir: Path,
@@ -41,30 +134,38 @@ def extract_one(
     graph_builder: APIGraphBuilder,
     static_ext: StaticPEExtractor,
     verify_dar: bool = False,
+    demo_only: bool = False,
 ) -> dict | None:
     sha256 = sample["sha256"]
-    pe_path = find_sample_file(samples_dir, sha256, sample.get("filename", ""))
-    if pe_path is None:
-        print(f"  [!] Sample not found: {sha256[:16]}...")
-        return None
-
-    if not is_pe_file(pe_path):
-        print(f"  [!] Not a PE file: {pe_path.name}")
-        return None
 
     log_path = Path(sample.get("sandbox_log", f"data/sandbox_logs/{sha256}.json"))
     if not log_path.is_absolute():
         log_path = ROOT / log_path
     api_calls = load_api_calls(log_path)
 
-    # Extract with individual extractors (for metadata)
-    static_data = static_ext.extract(pe_path)
+    # Try to find real PE file
+    pe_path = find_sample_file(samples_dir, sha256, sample.get("filename", ""))
+    has_pe = pe_path is not None and is_pe_file(pe_path) if pe_path else False
+
+    if has_pe:
+        # Real PE file available — full extraction
+        static_data = static_ext.extract(pe_path)
+    elif demo_only or api_calls:
+        # No PE file but we have sandbox log — synthesize static features
+        print(f"  [i] No PE file, using synthetic static features for {sha256[:16]}...")
+        static_data = _synthesize_static_features(
+            api_calls, sample.get("group", "G1"), static_ext.feature_dim
+        )
+    else:
+        print(f"  [!] No PE file and no sandbox log: {sha256[:16]}...")
+        return None
+
     behavior_data = behavior_ext.extract(api_calls)
     graph_data = graph_builder.build(static_data=static_data, api_calls=api_calls)
 
     # Build unified features for MCAFF
     unified = unified_ext.extract(
-        pe_path=pe_path,
+        pe_path=pe_path if has_pe else None,
         api_calls=api_calls,
         static_data=static_data,
         behavior_data=behavior_data,
@@ -72,7 +173,7 @@ def extract_one(
     )
 
     dar_info = {}
-    if verify_dar:
+    if verify_dar and has_pe:
         is_dar, reason, dar_meta = verify_dynamic_api_resolution(pe_path)
         dar_info = {
             "is_dynamic_api_resolution": is_dar,
@@ -86,6 +187,7 @@ def extract_one(
         "family_name": sample.get("family_name"),
         "group": sample.get("group"),
         "has_sandbox_log": len(api_calls) > 0,
+        "has_real_pe": has_pe,
         "dar_verification": dar_info,
         # Unified features for MCAFF (3 groups)
         "static_x": unified["static_x"].tolist(),
@@ -108,6 +210,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Extract unified features for MCAFF")
     parser.add_argument("--manifest", type=str, default=None)
     parser.add_argument("--verify-dar", action="store_true", help="Chạy heuristic DAR verification")
+    parser.add_argument(
+        "--demo-only", action="store_true",
+        help="Chỉ dùng sandbox logs, tạo synthetic static features (không cần PE files)",
+    )
     args = parser.parse_args()
 
     cfg = load_config()
@@ -123,6 +229,15 @@ def main() -> None:
     if not samples:
         print("No samples in manifest.")
         sys.exit(1)
+
+    # In demo-only mode, filter to samples that have sandbox logs
+    if args.demo_only:
+        before = len(samples)
+        samples = [
+            s for s in samples
+            if (ROOT / Path(s.get("sandbox_log", f"data/sandbox_logs/{s['sha256']}.json"))).exists()
+        ]
+        print(f"Demo-only mode: {len(samples)}/{before} samples have sandbox logs")
 
     features_cfg = cfg["features"]
     static_ext = StaticPEExtractor(feature_dim=features_cfg["static"]["feature_dim"])
@@ -163,7 +278,8 @@ def main() -> None:
         sha = sample["sha256"]
         print(f"Processing {sha[:16]}... ({sample.get('family_name', '?')} / {sample.get('group', '?')})")
         result = extract_one(
-            sample, samples_dir, unified_ext, behavior_ext, graph_builder, static_ext, args.verify_dar
+            sample, samples_dir, unified_ext, behavior_ext, graph_builder,
+            static_ext, args.verify_dar, demo_only=args.demo_only,
         )
         if result:
             save_json(result, processed_dir / f"{sha}.json")
@@ -175,6 +291,12 @@ def main() -> None:
                 print(f"  DAR verify: {tag} — {dv.get('dar_reason', '')}")
         else:
             fail += 1
+
+    if ok == 0:
+        print("\nKhông trích xuất được sample nào!")
+        if not args.demo_only:
+            print("Thử chạy với --demo-only để dùng synthetic static features.")
+        sys.exit(1)
 
     feature_dims = UnifiedFeatureExtractor.get_feature_dims()
     index = {
@@ -201,9 +323,10 @@ def main() -> None:
         },
     }
     save_json(index, processed_dir / "index.json")
-    print(f"\nExtracted {ok}/{len(samples)} (failed={fail}) → {processed_dir}")
+    print(f"\nExtracted {ok}/{len(samples)} (failed={fail}) -> {processed_dir}")
     print(f"Feature dims: static={feature_dims['static']}, behavior={feature_dims['behavior']}, graph={feature_dims['graph']}")
 
 
 if __name__ == "__main__":
     main()
+

@@ -6,6 +6,7 @@ Usage:
   python scripts/run_pipeline.py --step all
   python scripts/run_pipeline.py --step fetch --limit 3 --download
   python scripts/run_pipeline.py --step train --epochs 50
+  python scripts/run_pipeline.py --step all --demo-only   # Không cần PE files
 """
 
 from __future__ import annotations
@@ -37,6 +38,10 @@ def main() -> None:
     parser.add_argument("--download", action="store_true")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--verify-dar", action="store_true")
+    parser.add_argument(
+        "--demo-only", action="store_true",
+        help="Chỉ dùng sandbox logs, không cần PE files",
+    )
     args = parser.parse_args()
 
     steps = {
@@ -49,6 +54,7 @@ def main() -> None:
         "extract": lambda: run(
             [PYTHON, "scripts/02_extract_features.py"]
             + (["--verify-dar"] if args.verify_dar else [])
+            + (["--demo-only"] if args.demo_only else [])
         ),
         "train": lambda: run(
             [PYTHON, "scripts/03_train_model.py", "--epochs", str(args.epochs)]
@@ -57,7 +63,11 @@ def main() -> None:
     }
 
     if args.step == "all":
-        for name in ["check", "fetch", "extract", "train", "eval"]:
+        run_steps = ["check", "fetch", "extract", "train", "eval"]
+        if args.demo_only:
+            # Skip fetch/check in demo-only mode (no API needed)
+            run_steps = ["extract", "train", "eval"]
+        for name in run_steps:
             steps[name]()
     else:
         steps[args.step]()
@@ -65,3 +75,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

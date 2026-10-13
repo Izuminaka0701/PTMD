@@ -114,12 +114,13 @@ class TestStaticPEExtractor:
         assert result["feature_vector"].shape == (64,)
 
     def test_feature_dim_padding(self):
-        """Verify _pad_to_dim always outputs exactly feature_dim elements."""
+        """Verify _pad_to_dim extends short vectors with interaction terms."""
         from src.features.static_pe import StaticPEExtractor
 
         ext = StaticPEExtractor(feature_dim=64)
         raw = [float(i) for i in range(26)]
         padded = ext._pad_to_dim(raw)
+        # Should be extended beyond input size with polynomial terms
         assert padded.shape == (64,), f"Expected (64,), got {padded.shape}"
         # First 26 elements should be preserved
         assert padded[0] == 0.0

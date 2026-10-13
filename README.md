@@ -97,140 +97,67 @@ PTMD/
 
 ---
 
-## Hướng dẫn chạy
+## Hướng dẫn chạy trên Máy ảo (VM)
 
-### 1. Nên chạy ở đâu?
-
-| Hoạt động | Máy host (laptop/PC) | VM cô lập (khuyến nghị) |
-|-----------|:--------------------:|:----------------------:|
-| Đọc code, review source | ✅ An toàn | ✅ An toàn |
-| Cài đặt + chạy unit tests | ✅ An toàn | ✅ An toàn |
-| Chạy `generate_demo_logs.py` | ✅ An toàn (không có malware) | ✅ An toàn |
-| Train/eval với demo data | ✅ An toàn | ✅ An toàn |
-| Tải sample malware (`--download`) | ⛔ **KHÔNG NÊN** | ✅ Chỉ trên VM |
-| Mở/chạy file malware | ⛔ **CẤM** | ✅ Chỉ trên VM snapshot |
-| Dynamic analysis (Cuckoo/API Monitor) | ⛔ **CẤM** | ✅ Chỉ trên VM snapshot |
-
-> **Nguyên tắc:** Nếu workflow có liên quan đến file malware thật → **bắt buộc dùng VM cô lập**, tắt shared folders, snapshot trước khi phân tích.
-
-### 2. Yêu cầu hệ thống
+### 1. Yêu cầu VM
 
 - Windows 10/11 hoặc Linux (Ubuntu 22.04+)
 - Python 3.10+
-- **Không cần GPU / CUDA** — toàn bộ pipeline (extract → train → eval) chạy hoàn toàn trên CPU
-- Nếu dùng VM: **tắt shared folders** hoặc chỉ mount one-way, snapshot trước khi phân tích
+- **Không cần GPU** — MCAFF chạy hoàn toàn trên CPU
+- **Tắt shared folders** hoặc chỉ mount one-way
+- Snapshot VM trước khi phân tích malware
 
-### 3. Cài đặt
+### 2. Cài đặt
 
 ```bash
 cd PTMD
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/macOS
 
 pip install -r requirements.txt
+
+# Cấu hình API key MalwareBazaar
+copy .env.example .env
+# Sửa .env: ABUSECH_API_KEY=<key từ https://auth.abuse.ch/>
+
+python scripts/check_api.py   # Kiểm tra kết nối API
 ```
 
 > **Lưu ý:** Không cần cài `torch-geometric` hay CUDA toolkit — MCAFF chỉ dùng `torch` (CPU).
 
-### 4. Chạy CÓ mạng (full pipeline — trên VM)
-
-Cần mạng để tải metadata và sample từ MalwareBazaar.
+### 3. Pipeline đầy đủ
 
 ```bash
-# 4.1 Cấu hình API key
-copy .env.example .env
-# Sửa .env: ABUSECH_API_KEY=<key từ https://auth.abuse.ch/>
+# Chạy tất cả (fetch → extract → train → eval)
+python scripts/run_pipeline.py --step all --limit 5 --download
 
-# 4.2 Kiểm tra kết nối API
+# Hoặc từng bước:
+
+# Bước 0: Kiểm tra API
 python scripts/check_api.py
 
-# 4.3 Lấy metadata + tải sample malware
+# Bước 1: Lấy metadata + tải sample
 python scripts/01_fetch_sample_metadata.py --limit 5 --download
-# Script sẽ hỏi xác nhận trước khi tải. Password zip: infected
-# Dùng --yes để bỏ qua confirm (automation)
+# Password zip: infected
 
-# 4.4 (Tuỳ chọn) Tạo demo sandbox logs
+# Bước 1b (tuỳ chọn): Tạo demo logs để test pipeline
 python scripts/generate_demo_logs.py
 
-# 4.5 Dynamic analysis trên VM (Cuckoo / API Monitor / Procmon)
+# Bước 2: Dynamic analysis trên VM (Cuckoo / API Monitor / Procmon)
 # Export log JSON → data/sandbox_logs/<sha256>.json
+# Format mẫu: data/sandbox_logs/example_log_format.json
 
-# 4.6 Trích xuất features
+# Bước 3: Trích xuất features (unified)
 python scripts/02_extract_features.py
 
-# 4.7 Train MCAFF model (CPU)
+# Bước 4: Train MCAFF model (CPU)
 python scripts/03_train_model.py --epochs 50
 
-# 4.8 Evaluate
+# Bước 5: Evaluate
 python scripts/04_evaluate.py
 
-# 4.9 Predict sample mới
+# Bước 6: Predict sample mới
 python scripts/05_predict.py --sample data/samples/xxx.exe --log data/sandbox_logs/xxx.json
-```
-
-Hoặc chạy tất cả bằng 1 lệnh:
-```bash
-python scripts/run_pipeline.py --step all --limit 5 --download
-```
-
-### 5. Chạy KHÔNG có mạng (offline)
-
-Không cần API key, không cần MalwareBazaar. Phù hợp để **test pipeline** hoặc **demo đồ án**.
-
-```bash
-# 5.1 Cài đặt (cần cài dependencies trước khi offline)
-pip install -r requirements.txt
-
-# 5.2 Tạo demo sandbox logs (giả lập G1/G2/G3 patterns)
-python scripts/generate_demo_logs.py
-
-# 5.3 Trích xuất features từ demo logs
-python scripts/02_extract_features.py
-
-# 5.4 Train model
-python scripts/03_train_model.py --epochs 50
-
-# 5.5 Evaluate
-python scripts/04_evaluate.py
-```
-
-> **Lưu ý offline:**
-> - Bước 5.3 cần có file PE trong `data/samples/` — nếu không có sample thật, chỉ có behavior + graph features (static = zeros)
-> - Nếu đã clone repo [malware-api-dataset](https://github.com/nguyentrancaotri40-cmd/malware-api-dataset) trước khi offline:
->   ```bash
->   python scripts/import_malware_api_dataset.py --dataset-dir ../malware-api-dataset --pe-only
->   ```
-
-### 6. Chạy Unit Tests (không cần mạng)
-
-```bash
-python -m pytest tests/ -v
-
-# Hoặc chạy nhanh:
-python -m pytest tests/ -q
-```
-
-Tất cả 22 test cases chạy **hoàn toàn offline**, không gọi API, không cần sample malware.
-
-| Test file | Số tests | Kiểm tra |
-|-----------|:--------:|----------|
-| `test_static_pe.py` | 9 | RICH_HEADER compat, padding, entropy, IAT sparse |
-| `test_api_behavior.py` | 8 | G1 chain detection, hash args, categorize, truncation |
-| `test_io.py` | 5 | UTF-8 JSON round-trip, dir creation, seed |
-
-### Tóm tắt: Cần mạng ở bước nào?
-
-```
-check_api.py ─────────── ✅ CẦN MẠNG
-01_fetch_...py ────────── ✅ CẦN MẠNG
-00_download_samples.py ── ✅ CẦN MẠNG
-generate_demo_logs.py ─── ❌ OFFLINE OK
-02_extract_features.py ── ❌ OFFLINE OK
-03_train_model.py ─────── ❌ OFFLINE OK
-04_evaluate.py ─────────── ❌ OFFLINE OK
-05_predict.py ──────────── ❌ OFFLINE OK
-pytest tests/ ──────────── ❌ OFFLINE OK
 ```
 
 ---
@@ -339,4 +266,3 @@ Export từ:
 - MalwareBazaar API: https://bazaar.abuse.ch/api/
 - Vaswani et al. "Attention Is All You Need" (2017) — Multi-Head Attention mechanism
 - PyTorch: https://pytorch.org/
-#
